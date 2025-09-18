@@ -2,7 +2,7 @@
 
 ## Environment Configuration
 
-To set up the environment variables for this project, create a `.env.local` file in the root directory with the following variables:
+Create a `.env.local` file in the root directory with your Airtable credentials:
 
 ```bash
 # Master Airtable Configuration
@@ -33,8 +33,8 @@ Replace `your_api_key_here` with your actual Airtable API key. You can generate 
 
 ## Features
 
-- ✅ Real-time progress tracking
-- ✅ Error handling and user feedback
-- ✅ Automatic file naming with record IDs
-- ✅ Support for multiple image formats
-- ✅ Clean, modern UI with shadcn/ui components
+- Real-time progress tracking
+- Error handling and user feedback
+- Automatic file naming with record IDs
+- Support for multiple image formats
+- Clean, modern UI with shadcn/ui components

@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { getBaseTables } from "../bases/route";
 
-// Hardcoded table IDs for simple mode with their names
+// Use the actual table ID from your environment
 export const SIMPLE_TABLES = [
-  { id: "tblETQc4pbqxmXe36", name: "Table 1" },
-  { id: "tblrTdaEKwrnLq1Jq", name: "Table 2" },
-  { id: "tblEaxaZwBsAUqoTV", name: "Table 3" },
-  { id: "tblpnn4YfABsmJnVT", name: "Table 4" },
+  { id: process.env.MASTER_TABLE_ID || "tblg9gJhiXITziRS5", name: "Main Table" },
 ];
 
 // Hardcoded base ID for simple mode
@@ -36,7 +32,7 @@ async function getTableSchema(apiKey: string, baseId: string, tableId: string) {
 }
 
 // API route to get simple mode tables with attachment fields
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const apiKey = process.env.MASTER_AIRTABLE_API_KEY;
     if (!apiKey) {
@@ -53,27 +49,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch fields for each table
+    // Fetch fields for each table with error handling
     const tablesWithFields = await Promise.all(
       SIMPLE_TABLES.map(async (table) => {
-        const schema = await getTableSchema(apiKey, SIMPLE_BASE_ID, table.id);
-        const fields = schema?.fields || [];
-        return { 
-          id: table.id,
-          name: table.name,
-          fields: fields
-            .filter((field: any) => field.type === 'multipleAttachments')
-            .map((field: any) => ({
-              name: field.name,
-              type: 'attachment'
-            }))
-        };
+        try {
+          const schema = await getTableSchema(apiKey, SIMPLE_BASE_ID, table.id);
+          const fields = schema?.fields || [];
+          return { ...table, fields };
+        } catch (error) {
+          console.error(`Error fetching schema for table ${table.id}:`, error);
+          // Return table with empty fields if schema fetch fails
+          return { ...table, fields: [] };
+        }
       })
     );
 
     return NextResponse.json({
       baseId: SIMPLE_BASE_ID,
-      baseName: 'Master Base',
       tables: tablesWithFields
     });
   } catch (error) {
