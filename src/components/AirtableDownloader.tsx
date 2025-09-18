@@ -6,8 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Download, FileImage, Loader2, Settings } from 'lucide-react';
+import { Download, Loader2, FileImage } from 'lucide-react';
 
 interface DownloadStatus {
   isDownloading: boolean;
@@ -54,45 +53,27 @@ export default function AirtableDownloader() {
     downloadedFiles: 0,
   });
 
-  const [isAdvancedMode, setIsAdvancedMode] = useState(false);
   const [bases, setBases] = useState<Base[]>([]);
-  const [simpleTables, setSimpleTables] = useState<Table[]>([]);
   const [selectedBase, setSelectedBase] = useState<string>('');
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [selectedField, setSelectedField] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  // Fetch data based on mode
+  // Fetch all bases
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        if (isAdvancedMode) {
-          // Fetch all bases for advanced mode
-          console.log('Fetching all bases...');
-          const response = await fetch('/api/bases');
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data: BasesResponse = await response.json();
-          console.log('Received bases data:', data);
-          setBases(data.bases);
-        } else {
-          // Fetch simple mode tables
-          console.log('Fetching simple mode tables...');
-          const response = await fetch('/api/simple-tables');
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data: SimpleTablesResponse = await response.json();
-          console.log('Received simple tables data:', data);
-          setSimpleTables(data.tables || []);
-          setSelectedBase(data.baseId); // Auto-select the fixed base
+        console.log('Fetching all bases...');
+        const response = await fetch('/api/bases');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data: BasesResponse = await response.json();
+        console.log('Received bases data:', data);
+        setBases(data.bases);
       } catch (error) {
         console.error('Failed to fetch data:', error);
         setStatus(prev => ({
@@ -105,14 +86,12 @@ export default function AirtableDownloader() {
     };
 
     fetchData();
-  }, [isAdvancedMode]);
+  }, []);
 
-  // Get current table and its attachment fields based on mode
-  const currentBase = isAdvancedMode ? bases.find(base => base.id === selectedBase) : null;
-  const currentTable = isAdvancedMode 
-    ? currentBase?.tables?.find(table => table.id === selectedTable)
-    : simpleTables?.find(table => table.id === selectedTable);
-  const attachmentFields = currentTable?.fields?.filter(field => field.type === 'attachment') || [];
+  // Get current table and its attachment fields
+  const currentBase = bases.find(base => base.id === selectedBase);
+  const currentTable = currentBase?.tables?.find(table => table.id === selectedTable);
+  const attachmentFields = currentTable?.fields?.filter((field: any) => field.type === 'attachment') || [];
 
   const handleDownload = async () => {
     setStatus({
@@ -226,59 +205,32 @@ export default function AirtableDownloader() {
           Download Airtable Images
         </CardTitle>
         <CardDescription>
-          {isAdvancedMode 
-            ? "Select any base, table, and specific column to download images from."
-            : "Select from predefined tables to download images."
-          }
+          Select a base, table, and specific column to download images from.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Mode Toggle */}
-        <div className="flex items-center justify-between p-4 border rounded-lg">
-          <div className="flex items-center gap-3">
-            <Settings className="h-4 w-4" />
-            <div>
-              <Label htmlFor="mode-toggle" className="text-sm font-medium">
-                {isAdvancedMode ? "Advanced Mode" : "Simple Mode"}
-              </Label>
-              <p className="text-xs text-gray-500">
-                {isAdvancedMode 
-                  ? "Full access to all bases and tables" 
-                  : "Quick access to predefined tables"
-                }
-              </p>
-            </div>
-          </div>
-          <Switch
-            id="mode-toggle"
-            checked={isAdvancedMode}
-            onCheckedChange={setIsAdvancedMode}
-          />
-        </div>
-        {/* Advanced Mode - Base Selection */}
-        {isAdvancedMode && (
-          <div className="space-y-2">
-            <Label htmlFor="base-select">Airtable Base</Label>
-            <Select value={selectedBase || undefined} onValueChange={(value) => setSelectedBase(value || '')}>
-              <SelectTrigger>
-                <SelectValue placeholder={bases.length > 0 ? "Select a base" : "No bases available"} />
-              </SelectTrigger>
-              <SelectContent>
-                {bases.length > 0 ? (
-                  bases.map((base) => (
-                    <SelectItem key={base.id} value={base.id}>
-                      {base.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="no-bases" disabled>
-                    No bases found
+        {/* Base Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="base-select">Airtable Base</Label>
+          <Select value={selectedBase || undefined} onValueChange={(value) => setSelectedBase(value || '')}>
+            <SelectTrigger>
+              <SelectValue placeholder={bases.length > 0 ? "Select a base" : "No bases available"} />
+            </SelectTrigger>
+            <SelectContent>
+              {bases.length > 0 ? (
+                bases.map((base) => (
+                  <SelectItem key={base.id} value={base.id}>
+                    {base.name}
                   </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+                ))
+              ) : (
+                <SelectItem value="no-bases" disabled>
+                  No bases found
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Table Selection */}
         <div className="space-y-2">
@@ -288,23 +240,11 @@ export default function AirtableDownloader() {
               <SelectValue placeholder="Select a table" />
             </SelectTrigger>
             <SelectContent>
-              {isAdvancedMode ? (
-                currentBase?.tables.map((table) => (
-                  <SelectItem key={table.id} value={table.id}>
-                    {table.name}
-                  </SelectItem>
-                ))
-              ) : (
-                [
-                  { id: 'table1', name: 'Table 1' },
-                  { id: 'table2', name: 'Table 2' },
-                  { id: 'table3', name: 'Table 3' },
-                ].map((table) => (
-                  <SelectItem key={table.id} value={table.id}>
-                    {table.name}
-                  </SelectItem>
-                ))
-              )}
+              {currentBase?.tables.map((table) => (
+                <SelectItem key={table.id} value={table.id}>
+                  {table.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -319,7 +259,7 @@ export default function AirtableDownloader() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All image columns</SelectItem>
-                {attachmentFields.map((field) => (
+                {attachmentFields.map((field: any) => (
                   <SelectItem key={field.name} value={field.name}>
                     {field.name}
                   </SelectItem>
@@ -355,7 +295,7 @@ export default function AirtableDownloader() {
 
         <Button
           onClick={handleDownload}
-          disabled={status.isDownloading || !selectedTable || (isAdvancedMode && !selectedBase)}
+          disabled={status.isDownloading || !selectedTable || !selectedBase}
           className="w-full"
           size="lg"
         >
