@@ -6,7 +6,7 @@ import { promisify } from 'util';
 const readFile = promisify(fs.readFile);
 const unlink = promisify(fs.unlink);
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const zipPath = path.join(process.cwd(), 'temp', 'airtable-images.zip');
     

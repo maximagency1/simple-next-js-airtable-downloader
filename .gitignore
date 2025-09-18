@@ -38,3 +38,6 @@ next-env.d.ts
 # temporary files and downloads
 /temp/
 *.zip
+
+# Local Netlify folder
+.netlify

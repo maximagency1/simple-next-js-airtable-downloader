@@ -18,13 +18,21 @@ interface AirtableRecord {
   fields: Record<string, any>;
 }
 
-async function downloadImage(url: string, filename: string): Promise<{ buffer: Buffer; filename: string }> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.statusText}`);
+async function downloadImage(url: string, filename: string): Promise<{ buffer: Buffer; filename: string } | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download ${filename}: ${response.statusText}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    return { buffer, filename };
+  } catch (error) {
+    console.error(`Failed to download ${filename}:`, error);
+    return null;
   }
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { buffer, filename };
 }
 
 async function downloadImagesInBatches(
@@ -47,9 +55,9 @@ async function downloadImagesInBatches(
         // Only call onProgress after successful download to avoid race conditions
         try {
           onProgress({ downloadedFiles, currentFile: `Downloaded ${filename}`, totalFiles });
-        } catch (controllerError) {
+        } catch {
           // Ignore controller errors during progress updates
-        }
+        } 
         return result;
       } catch (error) {
         console.error(`Failed to download ${filename}:`, error);
@@ -63,7 +71,7 @@ async function downloadImagesInBatches(
     // Update progress after each batch
     try {
       onProgress({ downloadedFiles, currentFile: `Completed batch ${Math.ceil((i + batchSize) / batchSize)}`, totalFiles });
-    } catch (controllerError) {
+    } catch {
       // Ignore controller errors
     }
   }
@@ -134,17 +142,14 @@ export async function POST(request: NextRequest) {
         });
 
         // Extract all image URLs from specified field or all fields
-        const allImageUrls: Array<{ url: string; recordId: string; filename: string }> = [];
-        
-        records.forEach(record => {
-          const imageUrls = extractImageUrls(record, fieldName);
-          imageUrls.forEach((url, index) => {
-            const extension = url.split('.').pop()?.split('?')[0] || 'jpg';
-            const fieldSuffix = fieldName ? `_${fieldName}` : '';
-            const filename = `${record.id}${fieldSuffix}_${index + 1}.${extension}`;
-            allImageUrls.push({ url, recordId: record.id, filename });
-          });
-        });
+        const allImageUrls: Array<{ url: string; recordId: string; filename: string }> = records.flatMap((record: { id: string; fields: Record<string, any> }) => {
+          const recordId = record.id;
+          return record.fields[fieldName]?.map((attachment: { url: string; filename?: string }, index: number) => ({
+            url: attachment.url,
+            recordId,
+            filename: attachment.filename || `${recordId}_${fieldName}_${index + 1}.jpg`
+          })) || [];
+        }).filter((item: { url: string }) => item.url);
 
         const totalFiles = allImageUrls.length;
         
@@ -198,29 +203,30 @@ export async function POST(request: NextRequest) {
               downloadedFiles: downloadedImages.length
             })}\n\n`)
           );
-        } catch (error) {
-          // Ignore controller errors
+        } catch {
+          // Ignore controller errors during progress updates
         }
 
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
         
-        // Save zip file temporarily
-        const tempDir = path.join(process.cwd(), 'temp');
-        await mkdir(tempDir, { recursive: true });
-        const zipPath = path.join(tempDir, 'airtable-images.zip');
-        await writeFile(zipPath, zipBuffer);
+        // Convert ZIP buffer to base64 for direct download
+        const base64Zip = zipBuffer.toString('base64');
+        const dataUrl = `data:application/zip;base64,${base64Zip}`;
 
-        // Send completion message
         try {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ 
               type: 'complete', 
-              totalFiles: downloadedImages.length,
-              message: 'All images downloaded and zipped successfully!'
+              progress: 100,
+              currentFile: 'Download complete!',
+              totalFiles,
+              downloadedFiles: downloadedImages.length,
+              downloadUrl: dataUrl,
+              filename: 'airtable-images.zip'
             })}\n\n`)
           );
-        } catch (error) {
-          // Ignore controller errors
+        } catch {
+          // Ignore controller errors during progress updates
         }
 
         controller.close();

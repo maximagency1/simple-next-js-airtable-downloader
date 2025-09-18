@@ -91,7 +91,7 @@ export default function AirtableDownloader() {
   // Get current table and its attachment fields
   const currentBase = bases.find(base => base.id === selectedBase);
   const currentTable = currentBase?.tables?.find(table => table.id === selectedTable);
-  const attachmentFields = currentTable?.fields?.filter((field: any) => field.type === 'attachment') || [];
+  const attachmentFields = currentTable?.fields?.filter((field: { type: string }) => field.type === 'attachment') || [];
 
   const handleDownload = async () => {
     setStatus({
@@ -148,25 +148,24 @@ export default function AirtableDownloader() {
                   downloadedFiles: data.downloadedFiles,
                 }));
               } else if (data.type === 'complete') {
-                // Download the zip file
-                const zipResponse = await fetch('/api/download-zip');
-                const blob = await zipResponse.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `airtable-images-${new Date().toISOString().split('T')[0]}.zip`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-
-                setStatus({
+                setStatus(prev => ({
+                  ...prev,
                   isDownloading: false,
                   progress: 100,
-                  currentFile: 'Download complete!',
+                  currentFile: data.currentFile,
                   totalFiles: data.totalFiles,
-                  downloadedFiles: data.totalFiles,
-                });
+                  downloadedFiles: data.downloadedFiles
+                }));
+                
+                // Trigger download
+                if (data.downloadUrl) {
+                  const link = document.createElement('a');
+                  link.href = data.downloadUrl;
+                  link.download = data.filename || 'airtable-images.zip';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
               } else if (data.type === 'error') {
                 throw new Error(data.message);
               }
@@ -259,7 +258,7 @@ export default function AirtableDownloader() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All image columns</SelectItem>
-                {attachmentFields.map((field: any) => (
+                {attachmentFields.map((field: { name: string }) => (
                   <SelectItem key={field.name} value={field.name}>
                     {field.name}
                   </SelectItem>

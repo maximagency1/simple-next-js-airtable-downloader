@@ -6,7 +6,7 @@ const airtable = new Airtable({
   apiKey: process.env.MASTER_AIRTABLE_API_KEY,
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Fetch all bases using Airtable's metadata API
     const metaResponse = await fetch('https://api.airtable.com/v0/meta/bases', {
@@ -34,12 +34,12 @@ export async function GET(request: NextRequest) {
 
         if (schemaResponse.ok) {
           const schemaData = await schemaResponse.json();
-          const tables = schemaData.tables.map((table: any) => ({
+          const tables = schemaData.tables.map((table: { id: string; name: string; fields: any[] }) => ({
             id: table.id,
             name: table.name,
             fields: table.fields
-              .filter((field: any) => field.type === 'multipleAttachments')
-              .map((field: any) => ({
+              .filter((field: { type: string }) => field.type === 'multipleAttachments')
+              .map((field: { name: string }) => ({
                 name: field.name,
                 type: 'attachment'
               }))
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
           }
         ]
       });
-    } catch (fallbackError) {
+    } catch {
       return Response.json(
         { error: 'Failed to fetch bases' },
         { status: 500 }
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getTablesAndFields(base: any) {
+async function getTablesAndFields(base: { (tableId: string): any }) {
   // Try multiple common table names/IDs to find the actual table
   const possibleTableIds = [
     process.env.MASTER_TABLE_ID!, // From env
@@ -121,7 +121,7 @@ async function getTablesAndFields(base: any) {
       if (records.length > 0) {
         // Found a working table! Get all field names
         const allFieldNames = new Set<string>();
-        records.forEach((record: any) => {
+        records.forEach((record: { fields: Record<string, any> }) => {
           Object.keys(record.fields).forEach(fieldName => {
             allFieldNames.add(fieldName);
           });
@@ -153,7 +153,7 @@ async function getTablesAndFields(base: any) {
           fields: fields
         }];
       }
-    } catch (error) {
+    } catch {
       // Try next table ID
       continue;
     }

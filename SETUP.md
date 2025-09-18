@@ -7,8 +7,8 @@ Create a `.env.local` file in the root directory with your Airtable credentials:
 ```bash
 # Master Airtable Configuration
 MASTER_AIRTABLE_API_KEY=your_api_key_here
-MASTER_BASE_ID=appoS9oJXkMqCNh89
-MASTER_TABLE_ID=tblg9gJhiXITziRS5
+MASTER_BASE_ID=your_base_id_here
+MASTER_TABLE_ID=your_table_id_here
 ```
 
 Replace `your_api_key_here` with your actual Airtable API key. You can generate or manage your API keys from your Airtable account settings.
